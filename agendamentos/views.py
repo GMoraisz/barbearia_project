@@ -26,36 +26,45 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             "date": data_selecionada.strftime('%d/%m/%Y'),
             "morning": {
                 "timeRange": "08h-12h",
-                "appointments": []
+                "appointments": [],
+                "available": True
             },
             "afternoon": {
                 "timeRange": "13h-18h",
-                "appointments": []
+                "appointments": [],
+                "available": True
             },
             "night": {
                 "timeRange": "18h-21h",
-                "appointments": []
+                "appointments": [],
+                "available": True
             }
         }
 
-        # Adiciona os agendamentos nos períodos corretos
+        # Verifica a disponibilidade de cada período
         for agendamento in agendamentos.filter(data__date=data_selecionada):
-            hora = agendamento.data  # Agora estamos acessando o campo 'data'
+            hora = agendamento.data
             cliente = agendamento.cliente.nome
+            
+            # Verifica os períodos
             if hora.hour >= 8 and hora.hour < 12:
                 resultado["morning"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
+                resultado["morning"]["available"] = False  # Marca como indisponível
             elif hora.hour >= 13 and hora.hour < 18:
                 resultado["afternoon"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
+                resultado["afternoon"]["available"] = False  # Marca como indisponível
             elif hora.hour >= 18 and hora.hour <= 21:
                 resultado["night"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
+                resultado["night"]["available"] = False  # Marca como indisponível
 
+        # Retorna a resposta com a disponibilidade
         return Response(resultado)
