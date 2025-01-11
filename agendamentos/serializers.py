@@ -1,16 +1,20 @@
 from rest_framework import serializers
 from .models import Agendamento
-from servicos.serializers import ServicoSerializer
-from clientes.models import Cliente
 from servicos.models import Servico
 
-
 class AgendamentoSerializer(serializers.ModelSerializer):
-    cliente_nome = serializers.CharField(source='cliente.nome', read_only=True)  # Mostra o nome do cliente
-    servico = serializers.PrimaryKeyRelatedField(queryset=Servico.objects.all())  # Permite selecionar o serviço por ID
-    cliente = serializers.PrimaryKeyRelatedField(queryset=Cliente.objects.all())  # Permite selecionar o cliente por ID
+    cliente_nome = serializers.CharField(source='cliente.nome', read_only=True)
+    servico_nome_e_preco = serializers.SerializerMethodField()  # Campo adicional formatado
 
     class Meta:
         model = Agendamento
-        fields = ['id', 'cliente', 'cliente_nome', 'servico', 'data']  # Campos do serializer
-        read_only_fields = ['id', 'cliente_nome']  # Define campos somente leitura
+        fields = ['id', 'cliente', 'cliente_nome', 'servico', 'servico_nome_e_preco', 'data']
+        read_only_fields = ['id', 'cliente_nome', 'servico_nome_e_preco']
+
+    def get_servico_nome_e_preco(self, obj):
+        """
+        Retorna o nome do serviço com o preço formatado.
+        """
+        if obj.servico:
+            return f"{obj.servico.nome} - R$ {obj.servico.preco:.2f}"
+        return "Serviço não definido"
