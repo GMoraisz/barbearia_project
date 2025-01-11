@@ -1,5 +1,5 @@
 from django.utils.timezone import now
-from datetime import datetime, timedelta
+from datetime import datetime
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import viewsets
@@ -14,7 +14,7 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     def horarios_disponiveis(self, request):
         # Filtra os agendamentos futuros
         hoje = now()
-        agendamentos = Agendamento.objects.filter(data_horario__date__gte=hoje.date())
+        agendamentos = Agendamento.objects.filter(data__date__gte=hoje.date())
         
         # Formata os dados em períodos
         resultado = {}
@@ -39,8 +39,8 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
         }
 
         # Adiciona os agendamentos nos períodos corretos
-        for agendamento in agendamentos.filter(data_horario__date=data_selecionada):
-            hora = agendamento.data_horario
+        for agendamento in agendamentos.filter(data__date=data_selecionada):
+            hora = agendamento.data  # Agora estamos acessando o campo 'data'
             cliente = agendamento.cliente.nome
             if hora.hour >= 8 and hora.hour < 12:
                 resultado["morning"]["appointments"].append({
