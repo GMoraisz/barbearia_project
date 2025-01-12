@@ -12,9 +12,7 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'cliente_nome', 'servico_nome_e_preco']
 
     def get_servico_nome_e_preco(self, obj):
-        """
-        Retorna o nome do serviço com o preço formatado.
-        """
+
         if obj.servico:
             return f"{obj.servico.nome} - R$ {obj.servico.preco:.2f}"
         return "Serviço não definido"
