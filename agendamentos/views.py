@@ -1,14 +1,12 @@
 from django.utils.timezone import now
-from datetime import datetime
+from datetime import datetime, timedelta
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import viewsets
 from .models import Agendamento
 from .serializers import AgendamentoSerializer
-from .utils import horario_disponivel
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
     queryset = Agendamento.objects.all()
@@ -36,7 +34,7 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             )
 
         # Verifica se o horário está disponível (usando sua função `horario_disponivel`)
-        if not horario_disponivel(data_agendamento):
+        if not self.horario_disponivel(data_agendamento):
             return Response(
                 {"error": "Horário indisponível. Escolha outro horário."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -52,13 +50,13 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
+
     @action(detail=False, methods=['get'])
     def horarios_disponiveis(self, request):
         # Filtra os agendamentos futuros
         hoje = now()
         agendamentos = Agendamento.objects.filter(data__date__gte=hoje.date())
-        
+
         # Formata os dados em períodos
         resultado = {}
         data_solicitada = request.query_params.get("data", hoje.date().strftime('%Y-%m-%d'))
@@ -84,30 +82,74 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             }
         }
 
-        # Verifica a disponibilidade de cada período
+        # Verifica os agendamentos e atualiza a disponibilidade
         for agendamento in agendamentos.filter(data__date=data_selecionada):
             hora = agendamento.data
             cliente = agendamento.cliente.nome
-            
-            # Verifica os períodos
+
+            # Marca como ocupado se houver agendamento no mesmo horário
             if hora.hour >= 8 and hora.hour < 12:
                 resultado["morning"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
-                resultado["morning"]["available"] = False  # Marca como indisponível
+                resultado["morning"]["available"] = False
             elif hora.hour >= 13 and hora.hour < 18:
                 resultado["afternoon"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
-                resultado["afternoon"]["available"] = False  # Marca como indisponível
-            elif hora.hour >= 18 and hora.hour <= 21:
+                resultado["afternoon"]["available"] = False
+            elif hora.hour >= 18 and hora.hour < 21:
                 resultado["night"]["appointments"].append({
                     "time": hora.strftime('%H:%M'),
                     "client": cliente
                 })
-                resultado["night"]["available"] = False  # Marca como indisponível
+                resultado["night"]["available"] = False
+
+        # Verifica os horários disponíveis de 1 em 1 hora
+        for periodo, info in resultado.items():
+            if periodo in ["morning", "afternoon", "night"]:
+                horarios = []
+                start, end = 0, 0
+                if periodo == "morning":
+                    start, end = 8, 12
+                elif periodo == "afternoon":
+                    start, end = 13, 18
+                elif periodo == "night":
+                    start, end = 18, 21
+
+                for hora in range(start, end):
+                    horario_atual = datetime.combine(data_selecionada, datetime.min.time()) + timedelta(hours=hora)
+
+                    # Verifica se já há agendamentos no horário
+                    ocupado = agendamentos.filter(data__hour=hora, data__date=data_selecionada).exists()
+
+                    # Adiciona o horário somente se ele não estiver ocupado
+                    horarios.append({
+                        "time": horario_atual.strftime('%H:%M'),
+                        "available": not ocupado
+                    })
+
+                resultado[periodo]["appointments"] = horarios
+                resultado[periodo]["available"] = any(appointment["available"] for appointment in horarios)
 
         # Retorna a resposta com a disponibilidade
         return Response(resultado)
+
+    def horario_disponivel(self, data_agendamento):
+        # Verifica se o horário já está ocupado (sem levar em conta os minutos)
+        hora = data_agendamento.hour
+        dia = data_agendamento.date()
+
+        if Agendamento.objects.filter(data__hour=hora, data__date=dia).exists():
+            return False
+
+        return True
+
+    @action(detail=False, methods=['delete'])
+    def delete_all(self, request):
+        # Deleta todos os agendamentos
+        Agendamento.objects.all().delete()
+
+        return Response({"message": "Todos os agendamentos foram deletados com sucesso!"}, status=status.HTTP_204_NO_CONTENT)
