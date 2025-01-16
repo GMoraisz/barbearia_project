@@ -1,10 +1,9 @@
 from rest_framework import serializers
 from .models import Agendamento
-from servicos.models import Servico
 
 class AgendamentoSerializer(serializers.ModelSerializer):
     cliente_nome = serializers.CharField(source='cliente.nome', read_only=True)
-    servico_nome_e_preco = serializers.SerializerMethodField()  # Campo adicional formatado
+    servico_nome_e_preco = serializers.SerializerMethodField()  
 
     class Meta:
         model = Agendamento
